@@ -3,68 +3,52 @@ from base_data_by_station import BaseDlyStation, DlyTimeVar, BaseMissingInfo, Ba
     BadUnits, UnsupportedVar, good_flag, miss_flag, not_reported
 from local_defs import data_path, miss_path, src_qual_flag
 
-network_id = 8
-id_type = 2
-zlog_formats = {'dly':'keyddata','meta':'keydmeta'}
+network_id = 20
+id_type = 12
+zlog_formats = {'dly':'mowxdata','meta':'mowxmeta'}
 
 # size and time are used in the zlog_util to write stream
 #   size is the number of bytes for each datum (value,flag,time)
 #   time is the len of the ymd(h) tuple
 #   these are the defaults
 vXvN = Base_vXvN({
-    'TMAX': (1,8),
-    'TMIN': (2,8),
-    'MEAN': (4,7),
-    'SRAD': (10,7),
+    'TMAX': (1,22),
+    'TMIN': (2,22),
+    'TAVG': (116,3),
+    'SRAD': (70,4),
     }, size=9, time=3)
 
 
-class Keyed_Var(DlyTimeVar):
+class MOwx_Var(DlyTimeVar):
 #VELR 1111 1122 2222
 #  simple flag map
     flag = {
         '':  0x0040,
         ' ': 0x0040,
-        'T': 0x0080,
-        'A': 0x00C0,
-        'S': 0x0100,
         }
     
     def __init__(self, station, var_name, var_desc, base_units):
-        super(Keyed_Var,self).__init__(station, var_name, var_desc, base_units)
+        super(MOwx_Var,self).__init__(station, var_name, var_desc, base_units)
         station.vars[var_name] = self
 
 
-class KeyedStation(BaseDlyStation) :
-    dataset = 'keyed'
+class MOwxStation(BaseDlyStation) :
+    dataset = 'mowx'
     stn_id_type = 'mowx'
     full_month = False
     std_vars = {
-        'TMAX': (Keyed_Var,'Maximum Temperature','DegF'),    # (1,8),
-        'TMIN': (Keyed_Var,'Minimum Temperature','DegF'),    # (2,8),
-        'MEAN': (Keyed_Var,'Mean Daily Temperature','DegF'),          # (4,7),
-        'SRAD': (Keyed_Var,'Total Radiation Horizontal Surface','MJ/m2'),               # (10,7),
+        'TMAX': (MOwx_Var,'Maximum Temperature','0.1 DegF'),                  # (1,22),
+        'TMIN': (MOwx_Var,'Minimum Temperature','0.1 DegF'),                  # (2,22),
+        'TAVG': (MOwx_Var,'Mean Daily Temperature','0.1 DegF'),               # (116,3),
+        'SRAD': (MOwx_Var,'Total Radiation Horizontal Surface','0.01 MJ/m2'), # (70,4),
         }
     limits = {}
     
     def __init__(self, stn_id):
-        super(KeyedStation,self).__init__(stn_id)
-        stn_path = self.stn_path = [stn_id[:2],stn_id[2:]+'.nc']
-        self.nc_filename = os.path.join(data_path,*stn_path)
-        self.miss_filename = os.path.join(miss_path,*stn_path)
-        
-    def create(self, var_cnt_hint=0):
-        # check path
-        base_path = os.path.join(data_path,self.stn_path[0])
-        if not os.path.isdir(base_path) : os.mkdir(base_path)
-        super(KeyedStation,self).create(var_cnt_hint)
-
-    def create_missing(self, basetime=None) :
-        # check path
-        base_path = os.path.join(miss_path,self.stn_path[0])
-        if not os.path.isdir(base_path) : os.mkdir(base_path)
-        super(KeyedStation,self).create_missing(basetime)
-
+        super(MOwxStation,self).__init__(stn_id)
+        stn_path = self.stn_path = stn_id+'.nc'
+        self.nc_filename = os.path.join(data_path,stn_path)
+        self.miss_filename = os.path.join(miss_path,stn_path)
 
 class MissingInfo(BaseMissingInfo) :
     min_por_len = 3
@@ -73,15 +57,11 @@ class MissingInfo(BaseMissingInfo) :
     all_vars.sort()
     
     def get_station_list(self) :
-        stns = []
-        for state in sorted(os.listdir(data_path)) :
-            stns.extend([state+s[:-3] for s in os.listdir(os.path.join(
-                data_path,state)) if s.endswith('.nc')])
+        stns = [s[:-3] for s in os.listdir(data_path) if s.endswith('.nc')]
         return stns
 
     def get_missing_filename(self, stn_id) :
-        stn_path = [stn_id[:2],stn_id[2:]+'.nc']
-        return os.path.join(miss_path,*stn_path)
+        return os.path.join(miss_path,stn_id+'.nc')
         
     def get_stns(self, stns=None) :
         if stns is None :
